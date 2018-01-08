@@ -5,11 +5,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.uima.resource.ResourceInitializationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import data.JobAd;
+import de.uni_koeln.spinfo.classification.core.data.ClassifyUnit;
+import preprocessing.IO;
 import preprocessing.Vectorizer;
+import workflow.Workflow;
 
 public class App {
 
@@ -22,18 +26,32 @@ public class App {
 	public static void main(String[] args) throws FileNotFoundException {
 
 
-		Vectorizer vectorizer = new Vectorizer();
+		Workflow wf = new Workflow();
 		List<JobAd> jobAds = new ArrayList<JobAd>();
 		try {
-			jobAds = vectorizer.createJobAds(trainingDataPath, studiesPath,
+			jobAds = wf.createJobAds(trainingDataPath, studiesPath,
 					degreesPath, focusPath);
-			for (JobAd jobAd : jobAds) {
-				System.out.println(jobAd.getTitle()
-						+ "\n Content: " + jobAd.getContent());
-				
-			}
+			
+			IO io = new IO("src/main/resources/output/trainingdata");
+//			io.createCSV(wf.getFocuses(), jobAds, "src/main/resources/output/vectors.txt");
+			
+			
+			List<ClassifyUnit> cus = new ArrayList<ClassifyUnit>(jobAds);
+			wf.crossvalidate(cus);
+
+//			fsc.createFoldersForFocuses(wf.getFocuses(), jobAds);
+			
+			
+//			for (JobAd jobAd : jobAds) {
+//				System.out.println(jobAd.getTitle()
+//						+ "\n Content: " + jobAd.getContent());		
+//			}
+			
 		} catch (IOException e) {
 
+			e.printStackTrace();
+		} catch (ResourceInitializationException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
