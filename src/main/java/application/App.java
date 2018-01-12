@@ -11,14 +11,15 @@ import org.slf4j.LoggerFactory;
 
 import data.JobAd;
 import de.uni_koeln.spinfo.classification.core.data.ClassifyUnit;
-import preprocessing.IO;
+
 import preprocessing.Vectorizer;
 import workflow.Workflow;
+import workflow.IO;
 
 public class App {
 
 	private static Logger log = LoggerFactory.getLogger(App.class);
-	private static String trainingDataPath = "src/main/resources/data/trainingSets/JobAdDB.xlsx";
+	private static String trainingDataPath = "src/main/resources/data/trainingSets/JobAdDB_small.xlsx";
 	private static String studiesPath = "src/main/resources/data/studysubjects.xlsx";
 	private static String degreesPath = "src/main/resources/data/degrees.xlsx";
 	private static String focusPath = "src/main/resources/data/focuses.xlsx";

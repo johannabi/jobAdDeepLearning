@@ -48,6 +48,9 @@ public class TestApp {
 		
 		vectorizer.fit();
 		
+		//TODO crossvaldation
+		vectorizer.transform("text");
+		
 		
 		
 		 

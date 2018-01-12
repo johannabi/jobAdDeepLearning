@@ -1,6 +1,7 @@
 package preprocessing;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -11,9 +12,12 @@ import org.datavec.api.records.reader.RecordReader;
 import org.datavec.api.records.reader.impl.collection.ListStringRecordReader;
 import org.datavec.api.split.InputSplit;
 import org.datavec.api.split.ListStringSplit;
+import org.datavec.api.util.ClassPathResource;
 import org.deeplearning4j.bagofwords.vectorizer.BaseTextVectorizer;
 import org.deeplearning4j.bagofwords.vectorizer.TfidfVectorizer;
 import org.deeplearning4j.datasets.datavec.RecordReaderDataSetIterator;
+import org.deeplearning4j.text.sentenceiterator.labelaware.LabelAwareFileSentenceIterator;
+import org.deeplearning4j.text.sentenceiterator.labelaware.LabelAwareSentenceIterator;
 import org.deeplearning4j.text.tokenization.tokenizer.Tokenizer;
 import org.deeplearning4j.text.tokenization.tokenizerfactory.TokenizerFactory;
 import org.deeplearning4j.text.tokenization.tokenizerfactory.UimaTokenizerFactory;
@@ -24,12 +28,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import application.App;
+import data.JobAd;
 import de.uni_koeln.spinfo.classification.core.data.ClassifyUnit;
 import de.uni_koeln.spinfo.ml_classification.data.FocusClassifyUnit;
 
 public class Vectorizer {
 
 	private static Logger log = LoggerFactory.getLogger(App.class);
+	private TfidfVectorizer vectorizer;
+	
+	public TfidfVectorizer getVectorizer() {
+		return vectorizer;
+	}
 
 	public void initialize(List<ClassifyUnit> trainingSet) throws IOException, InterruptedException {
 
@@ -44,51 +54,45 @@ public class Vectorizer {
 		recRead.initialize(split);
 
 		DataSetIterator iter = new RecordReaderDataSetIterator(recRead, trainingSet.size(), 11, 12);
-		
 
 	}
+	
+	
 
-	public void vectorize(List<ClassifyUnit> trainingSet) throws ResourceInitializationException {
+	public List<JobAd> vectorize(String labeledFolder, List<ClassifyUnit> toVectorize)
+			throws ResourceInitializationException, FileNotFoundException {
 
-		// TokenizerFactory tokFac = new UimaTokenizerFactory();
-		//
-		// TfidfVectorizer vectorizer = new TfidfVectorizer.Builder()
-		// .setMinWordFrequency(1)
-		// .setStopWords(new ArrayList<String>())
-		// .setTokenizerFactory(tokFac)
-		// .setIterator(iter)
-		// .allowParallelTokenization(false)
-		//// .labels(labels)
-		//// .cleanup(true)
-		// .build();
+		// build vectorizer
+		File rootDir = new File(labeledFolder);
+		LabelAwareSentenceIterator iter = new LabelAwareFileSentenceIterator(rootDir);
 
-//		for (ClassifyUnit cu : trainingSet) {
-//
-//			DataSet dataSet;
-//
-//			Boolean inFocus = ((FocusClassifyUnit) cu).getInFocus().get("Webentwicklung");
-//			if (inFocus) {
-//				dataSet = vectorizer.vectorize(cu.getContent(), "Web");
-//			} else
-//				dataSet = vectorizer.vectorize(cu.getContent(), "NoWeb");
-//
-//			System.out.println(dataSet);
-//
-//			// System.out.println(cu.getContent());
-//			// tokFac.
-//			Tokenizer tokenizer = tokFac.create(cu.getContent());
-//			List<String> tokens = new ArrayList<String>();
-//
-//			// create tokens list
-//			while (tokenizer.hasMoreTokens()) {
-//				String token = tokenizer.nextToken();
-//				tokens.add(token);
-//			}
-//
-//			System.out.println(".....");
-//
-//			System.out.println(tokens);
-//		}
+		TokenizerFactory tokFac = new UimaTokenizerFactory();
+
+		vectorizer = new TfidfVectorizer.Builder()
+				.setMinWordFrequency(1)
+				.setStopWords(new ArrayList<String>())
+				.setTokenizerFactory(tokFac)
+				.setIterator(iter)
+				.allowParallelTokenization(false)
+				// .labels(labels)
+				// .cleanup(true)
+				.build();
+
+		vectorizer.fit();
+//		System.out.println(vectorizer.getIndex());
+		
+		List<JobAd> toReturn = new ArrayList<JobAd>();
+		// vectorize job ads
+		for (ClassifyUnit cu : toVectorize) {
+			JobAd jobAd = (JobAd) cu;
+			String content = jobAd.getContent();
+			INDArray array = vectorizer.transform(content);
+//			log.info(array.toString());
+			jobAd.setArray(array);
+			toReturn.add(jobAd);
+		}
+
+		return toReturn;
 
 	}
 

@@ -1,4 +1,4 @@
-package preprocessing;
+package workflow;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -19,12 +19,22 @@ public class IO {
 		this.dirPath = dirPath;
 	}
 	
+	public void createFoldersForFocuses(Set<String> focuses, 
+			List<ClassifyUnit> jobAds, String dirPath) throws IOException {
+		this.dirPath = dirPath;
+		createFoldersForFocuses(focuses, jobAds);
+		
+	}
 	
-	public void createFoldersForFocuses(Set<String> focuses, List<JobAd> jobAds) throws IOException {
+	
+	public void createFoldersForFocuses(Set<String> focuses,
+			List<ClassifyUnit> trainingSet) throws IOException {
 		
 		File dir = new File(dirPath);
 		if(!dir.isDirectory())
 			dir.mkdirs();
+		
+		
 		
 		//creates folder for each focus
 		for (String focus : focuses) {
@@ -33,7 +43,7 @@ public class IO {
 			
 		}
 		
-		for (ClassifyUnit classifyUnit : jobAds) {
+		for (ClassifyUnit classifyUnit : trainingSet) {
 			String content = ((FocusClassifyUnit) classifyUnit).getContent();
 			String id = ((FocusClassifyUnit) classifyUnit).getID().toString();
 			Map<String, Boolean> currFocuses = ((FocusClassifyUnit) classifyUnit).getInFocus();
@@ -94,7 +104,7 @@ public class IO {
 			
 		}
 			
-		System.out.println(contentFile.getAbsolutePath());
+//		System.out.println(contentFile.getAbsolutePath());
 		FileWriter fw = new FileWriter(contentFile);
 		fw.write(content);
 		fw.close();
