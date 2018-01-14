@@ -1,3 +1,4 @@
-/output/
-/labeled1/
-/unlabeled1/
+/labels/
+
+/trainingSets/JobAdDB_small.xlsx
+/trainingSets/JobAdDB.xslx
