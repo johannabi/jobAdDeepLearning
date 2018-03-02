@@ -16,19 +16,30 @@ import org.datavec.api.records.reader.RecordReader;
 import org.datavec.api.records.reader.impl.csv.CSVRecordReader;
 import org.datavec.api.split.FileSplit;
 import org.deeplearning4j.datasets.datavec.RecordReaderMultiDataSetIterator;
+import org.deeplearning4j.nn.graph.ComputationGraph;
+import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
+import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.api.MultiDataSet;
 import org.nd4j.linalg.dataset.api.iterator.MultiDataSetIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import data.DLExperimentConfiguration;
+import data.NeuralNetConfiguration;
 import de.uni_koeln.spinfo.classification.core.data.ClassifyUnit;
 import de.uni_koeln.spinfo.classification.core.data.ExperimentConfiguration;
 import de.uni_koeln.spinfo.classification.core.helpers.crossvalidation.CrossvalidationGroupBuilder;
 import de.uni_koeln.spinfo.classification.core.helpers.crossvalidation.TrainingTestSets;
 import de.uni_koeln.spinfo.ml_classification.workflow.FocusJobs;
+import evaluation.Evaluator;
+import neuralnet.AbstractComputationGraph;
+import neuralnet.AbstractMultiLayerNetwork;
+import neuralnet.DefaultCGGenerator;
+import neuralnet.MNISTExample;
 
 /**
  * Class contains several methods to handle preprocessing
+ * 
  * @author Johanna
  *
  */
@@ -36,11 +47,10 @@ public class Workflow {
 
 	private static Logger log = LoggerFactory.getLogger(Workflow.class);
 
-
 	private int numberOfTrainingVectors;
 	private int numberOfTestVectors;
 	private int numberOfFeatures;
-	
+
 	private List<String> featureLabels = new ArrayList<String>();
 	private List<String> focusLabels = new ArrayList<String>();
 	private List<String> degreeLabels = new ArrayList<String>();
@@ -48,7 +58,6 @@ public class Workflow {
 
 	private Set<String> focuses;
 	private String stopwordsFilePath = "src/main/resources/data/stopwords.txt";
-
 
 	public Set<String> getFocuses() {
 		return focuses;
@@ -82,20 +91,138 @@ public class Workflow {
 		return numberOfFeatures;
 	}
 
+	public void crossvalidate(String trainingDataPath, String focusesPath, String studySubjectsPath, String degreesPath,
+			DLExperimentConfiguration expConfig, int crossvalidation, List<Integer> firstHiddenNodes, List<Integer> secondHiddenNodes,
+			List<Double> learningRate) throws IOException {
+
+		log.info("Generate Data");
+
+		FocusJobs jobs = new FocusJobs(stopwordsFilePath);
+		List<ClassifyUnit> paragraphs = jobs.getCategorizedAdsFromFile(new File(trainingDataPath), false,
+				new File(focusesPath), new File(studySubjectsPath), new File(degreesPath), false);
+
+		paragraphs = jobs.initializeClassifyUnits(paragraphs, true);
+		paragraphs = jobs.setFeatures(paragraphs, expConfig.getFeatureConfiguration(), true);
+		paragraphs = jobs.setFeatureVectors(paragraphs, expConfig.getFeatureQuantifier(), null);
+
+		degreeLabels = new ArrayList<String>(jobs.getDegrees());
+		studySubjectLabels = new ArrayList<String>(jobs.getStudySubjects());
+		focusLabels = new ArrayList<String>(jobs.getFocuses());
+		
+		Map<String, List<String>> labelLists = new HashMap<String, List<String>>();
+		labelLists.put("Degree", degreeLabels);
+		labelLists.put("StudySubject", studySubjectLabels);
+		labelLists.put("Focus", focusLabels);
+		
+		for(Map.Entry<String, List<String>> e : labelLists.entrySet()) {
+			String labelType = e.getKey();
+			List<String> currentLabels = e.getValue();
+			for (Integer first : firstHiddenNodes) {
+				for (Integer second : secondHiddenNodes) {
+					for (Double rate : learningRate) {
+//						log.info("FirstHiddenNodes: " + first + " - SecondHiddenNodes: " + second + " - LearningRate: " + rate);
+						NeuralNetConfiguration nnc = new NeuralNetConfiguration(first, second, rate);
+						expConfig.setNnc(nnc);
+						crossvalidate(expConfig, paragraphs, crossvalidation, labelType, currentLabels);
+//						log.info("----------------------------------------------");
+					}
+				}
+			}
+		}
+		
+		
+		
+
+		
+
+	}
+
+	private void crossvalidate(DLExperimentConfiguration expConfig, List<ClassifyUnit> paragraphs, int crossvalidation, 
+			String labelType, List<String> currentLabels) {
+		CrossvalidationGroupBuilder<ClassifyUnit> cvgb = new CrossvalidationGroupBuilder<ClassifyUnit>(paragraphs,
+				crossvalidation);
+		Iterator<TrainingTestSets<ClassifyUnit>> iterator = cvgb.iterator();	
+		
+		Evaluator eval = new Evaluator(expConfig.getThreshold(), currentLabels);
+		Preprocessor prepro = new Preprocessor();
+
+		while (iterator.hasNext()) {
+
+			TrainingTestSets<ClassifyUnit> testSets = iterator.next();
+			List<ClassifyUnit> trainingSet = testSets.getTrainingSet();
+			List<ClassifyUnit> testSet = testSets.getTestSet();
+
+			MultiDataSet trainingData = prepro.getMultiDataSet(trainingSet, currentLabels, labelType);
+			MultiDataSet testData = prepro.getMultiDataSet(testSet, currentLabels, labelType);
+
+			int inputNodes = prepro.getNumberOfFeatures();
+			int numberOfLabels = prepro.getNumberOfLabels();
+			int numberOfTestData = testSet.size(); 
+
+			INDArray classified;
+			INDArray features;
+			INDArray gold;
+
+			// generates a neural net with given number of inputs and outputs
+			AbstractComputationGraph graphBuilder = new DefaultCGGenerator(expConfig.getNnc().getFirstHiddenNodes(),
+					expConfig.getNnc().getSecondHiddenNodes(), expConfig.getNnc().getLearningRate());
+			 ComputationGraph cgnet = graphBuilder.buildGraph(inputNodes, numberOfLabels);
+			 cgnet.init();
+			 // trains the neural network on the given training multidataset (sets weights
+			 // etc... )
+			 cgnet.fit(trainingData);
+			
+			 // classifies the given test multidataset in the trained neural network
+			 // "INDArray classified" contains matrix with probability of each label for	 
+			 //each test vector
+			 classified = cgnet.output(testData.getFeatures())[0];
+
+			
+//			AbstractMultiLayerNetwork networkBuilder = new MNISTExample();// new CNNGenerator();
+//			MultiLayerNetwork mlnet = networkBuilder.buildGraph(inputNodes, numberOfLabels);
+//			mlnet.init();
+//			mlnet.fit(trainingData);
+//			classified = mlnet.output(testData.getFeatures()[0]);
+			
+			
+
+			// "INDArray features" contains matrix with feature vectors of each test vector
+			features = testData.getFeatures()[0];
+			// "INDArray gold" contains matrix with desired labels (0 or 1) for each test
+			// vector
+			gold = testData.getLabels()[0];
+
+			eval.addResult(labelType, numberOfTestData, features, classified, gold);
+		}
+
+		// evaluates the classification for the given label type
+		eval.evaluate(labelType, expConfig);
+		
+	}
+
 	/**
 	 * transforms the given trainingdata into vectorized job ads and writes them
-	 * into CSVs for crossvalidation. 
-	 * @param trainingDataPath path to trainingdata (.xlsx File)
-	 * @param focusesPath path to focus labels (.xlsx File)
-	 * @param studySubjectsPath path to study subject labels (.xlsx File)
-	 * @param degreesPath path to degree labels (.xlsx File)
-	 * @param numberOfCrossValidGroups number of crossvalidation folds. for each fold will be produced
-	 * one test CSV and one training CSV
-	 * @param expConfig contains feature engineering configurations (stemmer, stopword filter,...)
-	 * @param currentDir directory where the CSVs will be writen
+	 * into CSVs for crossvalidation.
+	 * 
+	 * @param trainingDataPath
+	 *            path to trainingdata (.xlsx File)
+	 * @param focusesPath
+	 *            path to focus labels (.xlsx File)
+	 * @param studySubjectsPath
+	 *            path to study subject labels (.xlsx File)
+	 * @param degreesPath
+	 *            path to degree labels (.xlsx File)
+	 * @param numberOfCrossValidGroups
+	 *            number of crossvalidation folds. for each fold will be produced
+	 *            one test CSV and one training CSV
+	 * @param expConfig
+	 *            contains feature engineering configurations (stemmer, stopword
+	 *            filter,...)
+	 * @param currentDir
+	 *            directory where the CSVs will be writen
 	 * @throws IOException
 	 */
-	public void generateTrainingData(String trainingDataPath, String focusesPath, String studySubjectsPath,
+	public void generateTrainingDataCSV(String trainingDataPath, String focusesPath, String studySubjectsPath,
 			String degreesPath, int numberOfCrossValidGroups, ExperimentConfiguration expConfig, File currentDir)
 			throws IOException {
 		log.info("Generate Data");
@@ -108,12 +235,11 @@ public class Workflow {
 		paragraphs = jobs.initializeClassifyUnits(paragraphs, true);
 		paragraphs = jobs.setFeatures(paragraphs, expConfig.getFeatureConfiguration(), true);
 		paragraphs = jobs.setFeatureVectors(paragraphs, expConfig.getFeatureQuantifier(), null);
-		
+
 		featureLabels = expConfig.getFeatureQuantifier().getFeatureUnitOrder();
 		degreeLabels = new ArrayList<String>(jobs.getDegrees());
 		studySubjectLabels = new ArrayList<String>(jobs.getStudySubjects());
 		focusLabels = new ArrayList<String>(jobs.getFocuses());
-		
 
 		CrossvalidationGroupBuilder<ClassifyUnit> cvgb = new CrossvalidationGroupBuilder<ClassifyUnit>(paragraphs,
 				numberOfCrossValidGroups);
@@ -149,16 +275,20 @@ public class Workflow {
 		metadata.put("numberOfTestFiles", numberOfTestVectors);
 		metadata.put("numberOfFeatures", numberOfFeatures);
 
-		Util.writeMetadata(currentDir, metadata, featureLabels, studySubjectLabels,
-				focusLabels, degreeLabels);
+		Util.writeMetadata(currentDir, metadata, featureLabels, studySubjectLabels, focusLabels, degreeLabels);
 	}
 
 	/**
-	 * uses methods of dl4j to transform a CSV with multiple labels per row into a MultiDataSet
-	 * that can be read by a dl4j neural network
-	 * @param filePath path to CSV
-	 * @param batchSize number of rows (jobAds) in CSV
-	 * @param numberOfLabels number of labels for each jobAd (focus=12,study subject=15,degree=4)
+	 * uses methods of dl4j to transform a CSV with multiple labels per row into a
+	 * MultiDataSet that can be read by a dl4j neural network
+	 * 
+	 * @param filePath
+	 *            path to CSV
+	 * @param batchSize
+	 *            number of rows (jobAds) in CSV
+	 * @param numberOfLabels
+	 *            number of labels for each jobAd (focus=12,study
+	 *            subject=15,degree=4)
 	 * @return dataset that contains the data of CSV
 	 * @throws IOException
 	 * @throws InterruptedException
@@ -183,10 +313,12 @@ public class Workflow {
 	}
 
 	/**
-	 * reads metadata.txt in the given directory. File contains numbers of
-	 * degree, study and focus labels as well as number of features per vector,
-	 * number of test vectors and number of training vectors
-	 * @param experimentDir directory with CSVs and metadata.txt
+	 * reads metadata.txt in the given directory. File contains numbers of degree,
+	 * study and focus labels as well as number of features per vector, number of
+	 * test vectors and number of training vectors
+	 * 
+	 * @param experimentDir
+	 *            directory with CSVs and metadata.txt
 	 * @throws IOException
 	 */
 	public void inizialize(File experimentDir) throws IOException {

@@ -9,7 +9,7 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+import data.DLExperimentConfiguration;
 import de.uni_koeln.spinfo.classification.core.data.ClassifyUnit;
 import de.uni_koeln.spinfo.classification.core.data.ExperimentConfiguration;
 import de.uni_koeln.spinfo.classification.zoneAnalysis.data.CategoryResult;
@@ -84,16 +84,16 @@ public class Evaluator {
 					goldMap.put(labels.get(j), false);
 			}
 			
-			if (label.equals("focus")) { 
+			if (label.equals("Focus")) { 
 				fcu.setInFocus(goldMap);
 				fcu.setRanking(rankedMap);
 				cuClassified.put(fcu, classifiedMap);
-			} else if (label.equals("degree")) {
+			} else if (label.equals("Degree")) {
 				fcu.setDegrees(goldMap);
 				fcu.setExtractedDegrees(classifiedMap);
 				cuClassified.put(fcu, null);
 			}
-			else if (label.equals("studysubject")) {
+			else if (label.equals("StudySubject")) {
 				fcu.setStudySubjects(goldMap);
 				fcu.setExtractedStudies(classifiedMap);
 				cuClassified.put(fcu, null);
@@ -114,15 +114,17 @@ public class Evaluator {
 	 */
 	public void evaluate(String labelType, ExperimentConfiguration expConfig) {
 		
+		System.out.println(expConfig);
+		
 		MLEvaluator evaluator = new MLEvaluator();
 		Map<String, MLExperimentResult> results = null;
 		List<String> categories = null;
 		
-		if(labelType.equals("studysubject")) {
+		if(labelType.equals("StudySubject")) {
 			results = evaluator.evaluateStudySubjects(cuClassified, expConfig, categories, labels);
-		} else if(labelType.equals("degree")) {
+		} else if(labelType.equals("Degree")) {
 			results = evaluator.evaluateDegrees(cuClassified, expConfig, categories, labels);
-		} else if(labelType.equals("focus")) {
+		} else if(labelType.equals("Focus")) {
 			results = evaluator.evaluateFocuses(cuClassified, expConfig, categories, labels);
 		}
 

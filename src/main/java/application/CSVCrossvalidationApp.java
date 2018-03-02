@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.deeplearning4j.nn.graph.ComputationGraph;
+import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.api.MultiDataSet;
 import org.slf4j.Logger;
@@ -18,7 +19,11 @@ import de.uni_koeln.spinfo.classification.core.featureEngineering.featureWeighti
 import de.uni_koeln.spinfo.classification.core.featureEngineering.featureWeighting.LogLikeliHoodFeatureQuantifier;
 import de.uni_koeln.spinfo.ml_classification.classifiers.FocusMLKNNClassifier;
 import evaluation.Evaluator;
-import neuralnet.NeuralNetGenerator;
+import neuralnet.AbstractComputationGraph;
+import neuralnet.AbstractMultiLayerNetwork;
+import neuralnet.CNNGenerator;
+import neuralnet.DefaultCGGenerator;
+import neuralnet.MNISTExample;
 import workflow.Workflow;
 
 /**
@@ -64,6 +69,9 @@ public class CSVCrossvalidationApp {
 	/**path to excel that describes the given degrees*/
 	private static String degreesPath = "src/main/resources/data/labels/degrees.xlsx";
 	
+	private static AbstractComputationGraph graphBuilder = new DefaultCGGenerator();
+	private static AbstractMultiLayerNetwork networkBuilder = new MNISTExample();//new CNNGenerator();
+	
 	////
 	// configurations for feature engineering
 	////
@@ -79,20 +87,22 @@ public class CSVCrossvalidationApp {
 	//////
 
 	public static void main(String[] args) throws IOException, InterruptedException {
-		
+
 		//initialize feature engineering configurations
         FeatureUnitConfiguration fuc = new FeatureUnitConfiguration(normalizeInput, useStemmer, 
     			ignoreStopwords, nGrams, false, 0, suffixTrees);
         ExperimentConfiguration expConfig = new ExperimentConfiguration(fuc, quantifier, 
 				classifier, new File(trainingDataPath), null);
         
+        //directoryPath contains feature engineering configuration so that you don't need to write the
+        //CSVs every time again
         File experimentDir = new File(crossvalidationFolder.getAbsolutePath() + "/" + expConfig.toString());
         
         //if there are no CSVs for this experiment configurations, CSVs are written and put into the
         //experiment directory
         //otherwise metadata for the existing CSVs (e.g. number of features, number of labels,..) will be read
         if(!experimentDir.exists()) 
-        	wf.generateTrainingData(trainingDataPath, focusesPath, studySubjectsPath,
+        	wf.generateTrainingDataCSV(trainingDataPath, focusesPath, studySubjectsPath,
         			degreesPath, crossvalidation, expConfig, experimentDir);
         else
         	 wf.inizialize(experimentDir);
@@ -124,24 +134,39 @@ public class CSVCrossvalidationApp {
             	//multidataset that contains testvectors
                 MultiDataSet testData = wf.getMultiDataSet(experimentDir.getAbsolutePath() + "/" + labelType + "/testvectors" + i + ".txt",
                 		batchSizeTest, numberOfLabels);
+          
 
                 //neural net contains an input node for every feature
                 int inputNodes = wf.getNumberOfFeatures();
                 
+                INDArray classified;
+                INDArray features;
+                INDArray gold;
+                
                 //generates a neural net with given number of inputs and outputs
-                ComputationGraph net = NeuralNetGenerator.generateDefaultNet(inputNodes, numberOfLabels);
-
-                net.init();
+                ComputationGraph cgnet = graphBuilder.buildGraph(inputNodes, numberOfLabels);
+                MultiLayerNetwork mlnet = networkBuilder.buildGraph(inputNodes, numberOfLabels);
+                
+//                mlnet.init();
+//                log.info(mlnet.toString());
+//                mlnet.fit(trainingData);
+//                
+//                classified = mlnet.output(testData.getFeatures()[0]);
+                
+                
+                cgnet.init();
                 //trains the neural network on the given training multidataset (sets weights etc... )
-                net.fit(trainingData);
+                cgnet.fit(trainingData);
                 
                 //classifies the given test multidataset in the trained neural network
                 //"INDArray classified" contains matrix with probability of each label for each test vector
-                INDArray classified = net.output(testData.getFeatures())[0];
+                classified = cgnet.output(testData.getFeatures())[0];
+                
+                
                 //"INDArray features" contains matrix with feature vectors of each test vector
-                INDArray features = testData.getFeatures()[0];
+                features = testData.getFeatures()[0];
                 //"INDArray gold" contains matrix with desired labels (0 or 1) for each test vector
-                INDArray gold = testData.getLabels()[0];
+                gold = testData.getLabels()[0];
                 
                 //result of each fold of crossvalidation will be added to evaluator for evaluation
                 eval.addResult(labelType, batchSizeTest, features, classified, gold);

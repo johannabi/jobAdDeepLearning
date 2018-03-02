@@ -23,10 +23,15 @@
     </plugins>
   </build>
   
-  <properties>
-  	<nd4j.version>0.9.1</nd4j.version>
+  <!--<properties>
+  		<java.version>1.8</java.version>
+        <nd4j.version>0.9.1</nd4j.version>
+        <dl4j.version>0.9.1</dl4j.version>
+        <datavec.version>0.9.1</datavec.version>
+        <arbiter.version>0.9.1</arbiter.version>
+        <rl4j.version>0.9.1</rl4j.version>
   </properties>
-  
+	-->  
   
   <dependencies>
   	<!-- ND4J backend. You need one in every DL4J project. Normally define artifactId as either "nd4j-native-platform" or "nd4j-cuda-7.5-platform" -->
