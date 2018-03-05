@@ -8,19 +8,23 @@ import de.uni_koeln.spinfo.classification.core.featureEngineering.featureWeighti
 
 public class DLExperimentConfiguration extends ExperimentConfiguration{
 	
-//	private FeatureUnitConfiguration fuc;
+/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
+	//	private FeatureUnitConfiguration fuc;
 //	private AbstractFeatureQuantifier fq;
 	private NeuralNetConfiguration nnc;
 	private double threshold;
 //	private File dataFile;
 
 	public DLExperimentConfiguration(FeatureUnitConfiguration fuc, AbstractFeatureQuantifier fq,
-			 File dataFile, double threshold) {
+			 File dataFile) {
 		super(fuc, fq, dataFile);
 		this.fuc = fuc;
 		this.fq = fq;
 		this.dataFile = dataFile;
-		this.threshold = threshold;
+		this.threshold = 0.5;
 		
 	}
 	
@@ -42,7 +46,8 @@ public class DLExperimentConfiguration extends ExperimentConfiguration{
 			//buff.append("_");
 			buff.append(fq.getClass().getSimpleName());
 		}
-		buff.append("_");
+		
+		buff.append("_thres=" + threshold);
 		buff.append(nnc.toString());
 		buff.append("_");
 		buff.append(dataFile.getName());
@@ -51,6 +56,10 @@ public class DLExperimentConfiguration extends ExperimentConfiguration{
 
 	public double getThreshold() {
 		return threshold;
+	}
+
+	public void setThreshold(Double threshold) {
+		this.threshold = threshold;
 	}
 
 

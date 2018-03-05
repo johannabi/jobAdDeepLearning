@@ -1,6 +1,5 @@
 package evaluation;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,7 +8,6 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import data.DLExperimentConfiguration;
 import de.uni_koeln.spinfo.classification.core.data.ClassifyUnit;
 import de.uni_koeln.spinfo.classification.core.data.ExperimentConfiguration;
 import de.uni_koeln.spinfo.classification.zoneAnalysis.data.CategoryResult;
@@ -29,8 +27,8 @@ public class Evaluator {
 	private static Logger log = LoggerFactory.getLogger(Evaluator.class);
 
 	private Map<ClassifyUnit, Map<String, Boolean>> cuClassified = new HashMap<ClassifyUnit, Map<String, Boolean>>();
-	private double threshold = 0.5;
-	private List<String> labels = new ArrayList<String>();
+	private double threshold;
+	private List<String> labels;
 	
 	
 	public Evaluator(double threshold, List<String> labels) {
@@ -40,6 +38,7 @@ public class Evaluator {
 	
 	public Evaluator(List<String> labels) {
 		this.labels = labels;
+		this.threshold = 0.5;
 	}
 
 	/**
@@ -68,6 +67,7 @@ public class Evaluator {
 			// create classifiedMap (dichotom and ranking)
 			for (int j = 0; j < classified.size(1); j++) { //classified.size(1) corresponds to the number of columns of "classified"
 				double probability = currentClassified.getDouble(j);
+				log.info(probability + "");
 				rankedMap.put(labels.get(j), probability);
 				if (probability > threshold)
 					classifiedMap.put(labels.get(j), true); // TODO label
@@ -112,10 +112,8 @@ public class Evaluator {
 	 * @param labelType
 	 * @param expConfig
 	 */
-	public void evaluate(String labelType, ExperimentConfiguration expConfig) {
-		
-		System.out.println(expConfig);
-		
+	public Map<String, MLExperimentResult> evaluate(String labelType, ExperimentConfiguration expConfig) {
+
 		MLEvaluator evaluator = new MLEvaluator();
 		Map<String, MLExperimentResult> results = null;
 		List<String> categories = null;
@@ -127,7 +125,6 @@ public class Evaluator {
 		} else if(labelType.equals("Focus")) {
 			results = evaluator.evaluateFocuses(cuClassified, expConfig, categories, labels);
 		}
-
 
 		for (Map.Entry<String, MLExperimentResult> e : results.entrySet()) {
 			System.out.println("++++" + e.getKey() + "++++");
@@ -156,6 +153,8 @@ public class Evaluator {
 			System.out.println("----------------------------------------------------------------------");
 
 		}
+		
+		return results;
 	}
 
 }

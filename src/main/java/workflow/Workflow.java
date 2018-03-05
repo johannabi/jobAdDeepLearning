@@ -10,12 +10,15 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.datavec.api.records.reader.RecordReader;
 import org.datavec.api.records.reader.impl.csv.CSVRecordReader;
 import org.datavec.api.split.FileSplit;
 import org.deeplearning4j.datasets.datavec.RecordReaderMultiDataSetIterator;
+import org.deeplearning4j.nn.conf.layers.FeedForwardLayer;
 import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.nd4j.linalg.api.ndarray.INDArray;
@@ -25,11 +28,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import data.DLExperimentConfiguration;
+import data.LayerConfiguration;
 import data.NeuralNetConfiguration;
 import de.uni_koeln.spinfo.classification.core.data.ClassifyUnit;
 import de.uni_koeln.spinfo.classification.core.data.ExperimentConfiguration;
 import de.uni_koeln.spinfo.classification.core.helpers.crossvalidation.CrossvalidationGroupBuilder;
 import de.uni_koeln.spinfo.classification.core.helpers.crossvalidation.TrainingTestSets;
+import de.uni_koeln.spinfo.ml_classification.data.MLExperimentResult;
 import de.uni_koeln.spinfo.ml_classification.workflow.FocusJobs;
 import evaluation.Evaluator;
 import neuralnet.AbstractComputationGraph;
@@ -55,6 +60,8 @@ public class Workflow {
 	private List<String> focusLabels = new ArrayList<String>();
 	private List<String> degreeLabels = new ArrayList<String>();
 	private List<String> studySubjectLabels = new ArrayList<String>();
+
+	private Map<String, List<MLExperimentResult>> labelTypeResults = new HashMap<String, List<MLExperimentResult>>();
 
 	private Set<String> focuses;
 	private String stopwordsFilePath = "src/main/resources/data/stopwords.txt";
@@ -91,9 +98,26 @@ public class Workflow {
 		return numberOfFeatures;
 	}
 
-	public void crossvalidate(String trainingDataPath, String focusesPath, String studySubjectsPath, String degreesPath,
-			DLExperimentConfiguration expConfig, int crossvalidation, List<Integer> firstHiddenNodes, List<Integer> secondHiddenNodes,
-			List<Double> learningRate) throws IOException {
+	/**
+	 * creates feature vectors once and configures neural nets by the given parameters
+	 * @param trainingDataPath job ad database path
+	 * @param focusesPath
+	 * @param studySubjectsPath
+	 * @param degreesPath
+	 * @param expConfig
+	 * @param crossvalidation number of folds
+	 * @param firstHiddenNodes list of numbers for first hidden nodes
+	 * @param secondHiddenNodes lost of numbers for second hidden nodes
+	 * @param learningRate list of learning rates
+	 * @param threshold list of thresholds
+	 * @param activation list of array for activation (for each layer)
+	 * @return
+	 * @throws IOException
+	 */
+	public Map<String, List<MLExperimentResult>> crossvalidate(String trainingDataPath, String focusesPath,
+			String studySubjectsPath, String degreesPath, DLExperimentConfiguration expConfig, int crossvalidation,
+			List<Integer> firstHiddenNodes, List<Integer> secondHiddenNodes, List<Double> learningRate,
+			List<Double> threshold, List<String[]> activation) throws IOException {
 
 		log.info("Generate Data");
 
@@ -108,41 +132,55 @@ public class Workflow {
 		degreeLabels = new ArrayList<String>(jobs.getDegrees());
 		studySubjectLabels = new ArrayList<String>(jobs.getStudySubjects());
 		focusLabels = new ArrayList<String>(jobs.getFocuses());
-		
+
 		Map<String, List<String>> labelLists = new HashMap<String, List<String>>();
-		labelLists.put("Degree", degreeLabels);
+		// labelLists.put("Degree", degreeLabels);
 		labelLists.put("StudySubject", studySubjectLabels);
-		labelLists.put("Focus", focusLabels);
-		
-		for(Map.Entry<String, List<String>> e : labelLists.entrySet()) {
+		// labelLists.put("Focus", focusLabels);
+
+		for (Map.Entry<String, List<String>> e : labelLists.entrySet()) {
 			String labelType = e.getKey();
 			List<String> currentLabels = e.getValue();
 			for (Integer first : firstHiddenNodes) {
 				for (Integer second : secondHiddenNodes) {
 					for (Double rate : learningRate) {
-//						log.info("FirstHiddenNodes: " + first + " - SecondHiddenNodes: " + second + " - LearningRate: " + rate);
-						NeuralNetConfiguration nnc = new NeuralNetConfiguration(first, second, rate);
-						expConfig.setNnc(nnc);
-						crossvalidate(expConfig, paragraphs, crossvalidation, labelType, currentLabels);
-//						log.info("----------------------------------------------");
+						for (Double thres : threshold) {
+							for (String[] activ : activation) {
+								log.info("FirstHiddenNodes: " + first + " - SecondHiddenNodes: " + second
+										+ " - LearningRate: " + rate);
+
+								Map<String, FeedForwardLayer> layers = new TreeMap<String, FeedForwardLayer>();
+								// -1 declares that this layer gets the input nodes as input
+								layers.put("Dense1", LayerConfiguration.getDenseLayer(-1, first, activ[0], "zero")); 
+								// layers.put("Emb1", LayerConfiguration.getEmbeddingLayer(-1, first, "relu"));
+								layers.put("Dense2", LayerConfiguration.getDenseLayer(first, second, activ[1], "zero"));
+								layers.put("Dense3", LayerConfiguration.getDenseLayer(second, 100, activ[2], "zero"));
+								// layers.put("Dense4", LayerConfiguration.getDenseLayer(200, 50, "relu"));
+
+								boolean backprop = true;
+
+								NeuralNetConfiguration nnc = new NeuralNetConfiguration(rate, backprop, layers);
+								expConfig.setNnc(nnc);
+								expConfig.setThreshold(thres);
+								log.info(expConfig.toString());
+								crossvalidate(expConfig, paragraphs, crossvalidation, labelType, currentLabels);
+								// log.info("----------------------------------------------");
+							}
+							//
+						}
 					}
 				}
 			}
 		}
-		
-		
-		
-
-		
-
+		return labelTypeResults;
 	}
 
-	private void crossvalidate(DLExperimentConfiguration expConfig, List<ClassifyUnit> paragraphs, int crossvalidation, 
+	private void crossvalidate(DLExperimentConfiguration expConfig, List<ClassifyUnit> paragraphs, int crossvalidation,
 			String labelType, List<String> currentLabels) {
 		CrossvalidationGroupBuilder<ClassifyUnit> cvgb = new CrossvalidationGroupBuilder<ClassifyUnit>(paragraphs,
 				crossvalidation);
-		Iterator<TrainingTestSets<ClassifyUnit>> iterator = cvgb.iterator();	
-		
+		Iterator<TrainingTestSets<ClassifyUnit>> iterator = cvgb.iterator();
+
 		Evaluator eval = new Evaluator(expConfig.getThreshold(), currentLabels);
 		Preprocessor prepro = new Preprocessor();
 
@@ -157,34 +195,33 @@ public class Workflow {
 
 			int inputNodes = prepro.getNumberOfFeatures();
 			int numberOfLabels = prepro.getNumberOfLabels();
-			int numberOfTestData = testSet.size(); 
+			int numberOfTestData = testSet.size();
 
 			INDArray classified;
 			INDArray features;
 			INDArray gold;
 
 			// generates a neural net with given number of inputs and outputs
-			AbstractComputationGraph graphBuilder = new DefaultCGGenerator(expConfig.getNnc().getFirstHiddenNodes(),
-					expConfig.getNnc().getSecondHiddenNodes(), expConfig.getNnc().getLearningRate());
-			 ComputationGraph cgnet = graphBuilder.buildGraph(inputNodes, numberOfLabels);
-			 cgnet.init();
-			 // trains the neural network on the given training multidataset (sets weights
-			 // etc... )
-			 cgnet.fit(trainingData);
-			
-			 // classifies the given test multidataset in the trained neural network
-			 // "INDArray classified" contains matrix with probability of each label for	 
-			 //each test vector
-			 classified = cgnet.output(testData.getFeatures())[0];
+			AbstractComputationGraph graphBuilder = new DefaultCGGenerator(expConfig.getNnc().getLearningRate(),
+					expConfig.getNnc().getBackprop(), expConfig.getNnc().getLayers());
+			ComputationGraph cgnet = graphBuilder.buildGraph(inputNodes, numberOfLabels);
+			cgnet.init();
+			// trains the neural network on the given training multidataset (sets weights
+			// etc... )
+			cgnet.fit(trainingData);
 
-			
-//			AbstractMultiLayerNetwork networkBuilder = new MNISTExample();// new CNNGenerator();
-//			MultiLayerNetwork mlnet = networkBuilder.buildGraph(inputNodes, numberOfLabels);
-//			mlnet.init();
-//			mlnet.fit(trainingData);
-//			classified = mlnet.output(testData.getFeatures()[0]);
-			
-			
+			// classifies the given test multidataset in the trained neural network
+			// "INDArray classified" contains matrix with probability of each label for
+			// each test vector
+			classified = cgnet.output(testData.getFeatures())[0];
+
+			// AbstractMultiLayerNetwork networkBuilder = new MNISTExample();// new
+			// CNNGenerator();
+			// MultiLayerNetwork mlnet = networkBuilder.buildGraph(inputNodes,
+			// numberOfLabels);
+			// mlnet.init();
+			// mlnet.fit(trainingData);
+			// classified = mlnet.output(testData.getFeatures()[0]);
 
 			// "INDArray features" contains matrix with feature vectors of each test vector
 			features = testData.getFeatures()[0];
@@ -196,8 +233,16 @@ public class Workflow {
 		}
 
 		// evaluates the classification for the given label type
-		eval.evaluate(labelType, expConfig);
-		
+		Map<String, MLExperimentResult> currResults = eval.evaluate(labelType, expConfig);
+
+		// adds the result to the result map
+		for (Map.Entry<String, MLExperimentResult> e : currResults.entrySet()) {
+			List<MLExperimentResult> results = new ArrayList<MLExperimentResult>();
+			if (labelTypeResults.containsKey(e.getKey()))
+				results = labelTypeResults.get(e.getKey());
+			results.add(e.getValue());
+			labelTypeResults.put(e.getKey(), results);
+		}
 	}
 
 	/**

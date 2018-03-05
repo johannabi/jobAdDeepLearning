@@ -56,6 +56,14 @@ public class Preprocessor {
 		return null;
 	}
 	
+	/**
+	 * creates a MultiDataSet (containing INDArray for features and INDArray for labels)
+	 * with the given parameters
+	 * @param jobAds job ads to write in the data set
+	 * @param labels labels to write in the data set
+	 * @param labelType label type that should be written (StudySubject, Degree, Focus)
+	 * @return
+	 */
 	public MultiDataSet getMultiDataSet(List<ClassifyUnit> jobAds, List<String> labels, String labelType) {
 		
 		numberOfFeatures= jobAds.get(0).getFeatureVector().length;

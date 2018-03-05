@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.deeplearning4j.nn.conf.layers.FeedForwardLayer;
 import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.nd4j.linalg.api.ndarray.INDArray;
@@ -69,7 +70,7 @@ public class CSVCrossvalidationApp {
 	/**path to excel that describes the given degrees*/
 	private static String degreesPath = "src/main/resources/data/labels/degrees.xlsx";
 	
-	private static AbstractComputationGraph graphBuilder = new DefaultCGGenerator();
+	private static AbstractComputationGraph graphBuilder = new DefaultCGGenerator(new HashMap<String, FeedForwardLayer>());
 	private static AbstractMultiLayerNetwork networkBuilder = new MNISTExample();//new CNNGenerator();
 	
 	////
