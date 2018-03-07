@@ -73,18 +73,22 @@ public class Util {
 			headRow.add("nIn1");
 			headRow.add("nOut1");
 			headRow.add("act1");
+			headRow.add("weight1");
 			headRow.add("layer2");
 			headRow.add("nIn2");
 			headRow.add("nOut2");
 			headRow.add("act2");
+			headRow.add("weight2");
 			headRow.add("layer3");
 			headRow.add("nIn3");
 			headRow.add("nOut3");
 			headRow.add("act3");
+			headRow.add("weight3");
 			headRow.add("layer4");
 			headRow.add("nIn4");
 			headRow.add("nOut4");
 			headRow.add("act4");
+			headRow.add("weight4");
 			int startResult = headRow.size();
 			headRow.add("hammingLoss");
 			
@@ -160,6 +164,9 @@ public class Util {
 					
 					cell = row.createCell(c++);
 					cell.setCellValue(layerConfig[3].replaceAll("act=", ""));
+					
+					cell = row.createCell(c++);
+					cell.setCellValue(layerConfig[4].replaceAll("w=", ""));
 	
 				}
 				
@@ -198,7 +205,7 @@ public class Util {
 						cell.setCellValue(m.getValue());
 					}
 				}
-				
+				c = c + 3;
 				//cat results
 				catResults = result.getMLCategoryEvaluations();	
 				for (MLCategoryResult cat : catResults) {

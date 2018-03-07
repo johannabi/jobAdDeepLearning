@@ -49,7 +49,8 @@ public class NeuralNetConfiguration {
 			buff.append("_layer=" + l.getClass().getSimpleName()
 									+ "_nIn=" + l.getNIn()
 									+ "_nOut=" + l.getNOut()
-									+ "_act=" + l.getActivationFn());
+									+ "_act=" + l.getActivationFn()
+									+ "_w=" + l.getWeightInit());
 		}
 		return buff.toString();
 	}

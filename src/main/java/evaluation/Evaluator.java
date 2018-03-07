@@ -67,7 +67,7 @@ public class Evaluator {
 			// create classifiedMap (dichotom and ranking)
 			for (int j = 0; j < classified.size(1); j++) { //classified.size(1) corresponds to the number of columns of "classified"
 				double probability = currentClassified.getDouble(j);
-				log.info(probability + "");
+//				log.info(probability + "");
 				rankedMap.put(labels.get(j), probability);
 				if (probability > threshold)
 					classifiedMap.put(labels.get(j), true); // TODO label

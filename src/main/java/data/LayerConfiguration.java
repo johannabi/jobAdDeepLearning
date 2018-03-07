@@ -1,7 +1,10 @@
 package data;
 
+import org.deeplearning4j.nn.conf.layers.BaseOutputLayer;
+import org.deeplearning4j.nn.conf.layers.CenterLossOutputLayer;
 import org.deeplearning4j.nn.conf.layers.DenseLayer;
 import org.deeplearning4j.nn.conf.layers.EmbeddingLayer;
+import org.deeplearning4j.nn.conf.layers.FeedForwardLayer;
 import org.deeplearning4j.nn.conf.layers.OutputLayer;
 import org.deeplearning4j.nn.weights.WeightInit;
 import org.nd4j.linalg.activations.Activation;
@@ -16,17 +19,40 @@ public class LayerConfiguration {
 	 * @param weight type of initial weight (xavier, zero)
 	 * @return
 	 */
-	public static DenseLayer getDenseLayer(int nIn, int nOut, String activ, String weight) {
+	public static DenseLayer getDenseLayer(int nIn, int nOut, Activation activ, WeightInit weight) {
 
-		DenseLayer layer = new DenseLayer.Builder().nIn(nIn).nOut(nOut).weightInit(getWeight(weight))
-				.activation(getActivation(activ)).build();
+		DenseLayer layer = new DenseLayer.Builder().nIn(nIn).nOut(nOut).weightInit(weight)
+				.activation(activ).build();
+		return layer;
+	}
+	
+	public static CenterLossOutputLayer getCenterLossOutputLayer(int nIn, int nOut, WeightInit weight) {		
+		CenterLossOutputLayer layer = new CenterLossOutputLayer.Builder()
+				.nIn(nIn)
+				.nOut(nOut)	
+				.weightInit(weight)
+				.build();
+		
+		return layer;
+	}
+	
+	public static OutputLayer getOutputLayer(int nIn, int nOut) {
+		OutputLayer layer = new OutputLayer.Builder()
+				.nIn(nIn)
+				.nOut(nOut)
+				.build();
+		
 		return layer;
 	}
 
-	public static EmbeddingLayer getEmbeddingLayer(int nIn, int nOut, String activ, String weight) {
+	public static EmbeddingLayer getEmbeddingLayer(int nIn, int nOut, Activation activation, WeightInit weight) {
 
-		EmbeddingLayer layer = new EmbeddingLayer.Builder().nIn(nIn).nOut(nOut).weightInit(getWeight(weight))
-				.activation(getActivation(activ)).build();
+		EmbeddingLayer layer = new EmbeddingLayer.Builder()
+				.nIn(nIn)
+				.nOut(nOut)
+				.weightInit(weight)
+				.activation(activation)
+				.build();
 		return layer;
 	}
 
@@ -48,11 +74,19 @@ public class LayerConfiguration {
 
 		if (weight.equals("xavier"))
 			weightInit = WeightInit.XAVIER;
-		if (weight.equals("zero"))
+		else if (weight.equals("zero"))
 			weightInit = WeightInit.ZERO;
+		else if (weight.equals("distribution"))
+			weightInit = WeightInit.DISTRIBUTION;
+		else if (weight.equals("uniform"))
+			weightInit = WeightInit.UNIFORM;
+		else if (weight.equals("relu"))
+			weightInit = WeightInit.RELU;
 
 		return weightInit;
 
 	}
+
+	
 
 }

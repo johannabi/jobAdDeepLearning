@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -20,7 +19,8 @@ import org.datavec.api.split.FileSplit;
 import org.deeplearning4j.datasets.datavec.RecordReaderMultiDataSetIterator;
 import org.deeplearning4j.nn.conf.layers.FeedForwardLayer;
 import org.deeplearning4j.nn.graph.ComputationGraph;
-import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
+import org.deeplearning4j.nn.weights.WeightInit;
+import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.api.MultiDataSet;
 import org.nd4j.linalg.dataset.api.iterator.MultiDataSetIterator;
@@ -38,9 +38,7 @@ import de.uni_koeln.spinfo.ml_classification.data.MLExperimentResult;
 import de.uni_koeln.spinfo.ml_classification.workflow.FocusJobs;
 import evaluation.Evaluator;
 import neuralnet.AbstractComputationGraph;
-import neuralnet.AbstractMultiLayerNetwork;
 import neuralnet.DefaultCGGenerator;
-import neuralnet.MNISTExample;
 
 /**
  * Class contains several methods to handle preprocessing
@@ -116,8 +114,8 @@ public class Workflow {
 	 */
 	public Map<String, List<MLExperimentResult>> crossvalidate(String trainingDataPath, String focusesPath,
 			String studySubjectsPath, String degreesPath, DLExperimentConfiguration expConfig, int crossvalidation,
-			List<Integer> firstHiddenNodes, List<Integer> secondHiddenNodes, List<Double> learningRate,
-			List<Double> threshold, List<String[]> activation) throws IOException {
+			List<Integer> firstHiddenNodes, List<Integer> secondHiddenNodes, List<Integer> thirdHiddenNodes, List<Double> learningRate,
+			List<Double> threshold, List<Activation[]> activation, List<WeightInit[]> weightInit, List<Boolean> backprops) throws IOException {
 
 		log.info("Generate Data");
 
@@ -134,41 +132,46 @@ public class Workflow {
 		focusLabels = new ArrayList<String>(jobs.getFocuses());
 
 		Map<String, List<String>> labelLists = new HashMap<String, List<String>>();
-		// labelLists.put("Degree", degreeLabels);
-		labelLists.put("StudySubject", studySubjectLabels);
-		// labelLists.put("Focus", focusLabels);
+		labelLists.put("Degree", degreeLabels);
+//		labelLists.put("StudySubject", studySubjectLabels);
+//		labelLists.put("Focus", focusLabels);
 
 		for (Map.Entry<String, List<String>> e : labelLists.entrySet()) {
 			String labelType = e.getKey();
 			List<String> currentLabels = e.getValue();
 			for (Integer first : firstHiddenNodes) {
 				for (Integer second : secondHiddenNodes) {
-					for (Double rate : learningRate) {
-						for (Double thres : threshold) {
-							for (String[] activ : activation) {
-								log.info("FirstHiddenNodes: " + first + " - SecondHiddenNodes: " + second
-										+ " - LearningRate: " + rate);
+					for (Integer third : thirdHiddenNodes) {
+						for (Double rate : learningRate) {
+							for (Double thres : threshold) {
+								for (Activation[] activ : activation) {
+									for(WeightInit[] weight : weightInit) {
+									for (boolean backprop : backprops) {
 
-								Map<String, FeedForwardLayer> layers = new TreeMap<String, FeedForwardLayer>();
-								// -1 declares that this layer gets the input nodes as input
-								layers.put("Dense1", LayerConfiguration.getDenseLayer(-1, first, activ[0], "zero")); 
-								// layers.put("Emb1", LayerConfiguration.getEmbeddingLayer(-1, first, "relu"));
-								layers.put("Dense2", LayerConfiguration.getDenseLayer(first, second, activ[1], "zero"));
-								layers.put("Dense3", LayerConfiguration.getDenseLayer(second, 100, activ[2], "zero"));
-								// layers.put("Dense4", LayerConfiguration.getDenseLayer(200, 50, "relu"));
+										Map<String, FeedForwardLayer> layers = new TreeMap<String, FeedForwardLayer>();
+										// -1 declares that this layer gets the input nodes as input
+										layers.put("Dense1", LayerConfiguration.getDenseLayer(-1, first, activ[0], weight[0])); 
+										// layers.put("Emb1", LayerConfiguration.getEmbeddingLayer(-1, first, "relu"));
+										layers.put("Dense2", LayerConfiguration.getDenseLayer(first, second, activ[1], weight[1]));
+										layers.put("Dense3", LayerConfiguration.getDenseLayer(second, third, activ[2], weight[2]));
+										// -2 declares that this layer outputs the output nodes (labels)
+										layers.put("Output", LayerConfiguration.getCenterLossOutputLayer(third, -2, weight[3]));
+										// layers.put("Dense4", LayerConfiguration.getDenseLayer(200, 50, "relu"));
 
-								boolean backprop = true;
-
-								NeuralNetConfiguration nnc = new NeuralNetConfiguration(rate, backprop, layers);
-								expConfig.setNnc(nnc);
-								expConfig.setThreshold(thres);
-								log.info(expConfig.toString());
-								crossvalidate(expConfig, paragraphs, crossvalidation, labelType, currentLabels);
-								// log.info("----------------------------------------------");
+										NeuralNetConfiguration nnc = new NeuralNetConfiguration(rate, backprop, layers);
+										expConfig.setNnc(nnc);
+										expConfig.setThreshold(thres);
+										log.info(expConfig.toString());
+										crossvalidate(expConfig, paragraphs, crossvalidation, labelType, currentLabels);
+										// log.info("----------------------------------------------");
+									}
+									}
+								}
+								//
 							}
-							//
 						}
 					}
+					
 				}
 			}
 		}
@@ -191,8 +194,8 @@ public class Workflow {
 			List<ClassifyUnit> testSet = testSets.getTestSet();
 
 			MultiDataSet trainingData = prepro.getMultiDataSet(trainingSet, currentLabels, labelType);
-			MultiDataSet testData = prepro.getMultiDataSet(testSet, currentLabels, labelType);
-
+			MultiDataSet testData = prepro.getMultiDataSet(testSet, currentLabels, labelType);	
+			
 			int inputNodes = prepro.getNumberOfFeatures();
 			int numberOfLabels = prepro.getNumberOfLabels();
 			int numberOfTestData = testSet.size();

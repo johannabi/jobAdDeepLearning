@@ -8,6 +8,7 @@ import org.deeplearning4j.nn.conf.ComputationGraphConfiguration;
 import org.deeplearning4j.nn.conf.ComputationGraphConfiguration.GraphBuilder;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.conf.Updater;
+import org.deeplearning4j.nn.conf.layers.CenterLossOutputLayer;
 import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
 import org.deeplearning4j.nn.conf.layers.DenseLayer;
 import org.deeplearning4j.nn.conf.layers.FeedForwardLayer;
@@ -64,22 +65,20 @@ public class DefaultCGGenerator extends AbstractComputationGraph {
 				.graphBuilder();
 
 		String currentInput = "input";
-		int currentNOut = 0;
+//		int currentNOut = 0;
 
 		builder.addInputs(currentInput);
 		for (Map.Entry<String, FeedForwardLayer> e : layers.entrySet()) {
-			if (e.getValue().getNIn() < 0)
+			if (e.getValue().getNIn() == -1)
 				e.getValue().setNIn(numberOfInputs);
+			if (e.getValue().getNOut() == -2)
+				e.getValue().setNOut(numberOfOutputs);
 			builder.addLayer(e.getKey(), e.getValue(), currentInput);
 			currentInput = e.getKey();
-			currentNOut = e.getValue().getNOut();
+//			currentNOut = e.getValue().getNOut();
 		}
-		ComputationGraphConfiguration conf = builder.addLayer("Output",
-				new OutputLayer.Builder()
-				.nIn(currentNOut)
-				.nOut(numberOfOutputs)
-				.build(), currentInput)
-				
+
+		ComputationGraphConfiguration conf = builder		
 				.setOutputs("Output")
 				.backprop(backprop)
 				.build();
